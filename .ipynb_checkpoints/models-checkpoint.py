@@ -36,10 +36,13 @@ class FNet(torch.nn.Module):
         self.linear = torch.nn.Linear(self.n_locations, self.n_locations, device=DEVICE) 
 
     def forward(self, w): 
-        inp = F.one_hot(w).float()
-        # print("INPUT:", inp)
-        return self.linear(inp)
-    
+        try:
+            inp = F.one_hot(w, num_classes=self.n_locations).float()
+            return self.linear(inp)
+        except Exception as e: 
+            print(w.shape, inp.shape)
+            print(e)
+            
 
 def loss_fn(p, f, W, Z, problem): 
     f_pred = f(W)
