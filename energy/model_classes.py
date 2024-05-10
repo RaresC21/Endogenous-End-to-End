@@ -54,7 +54,42 @@ class Net(nn.Module):
         var = torch.mean((Y_pred-Y)**2, 0)
         self.sig.data = torch.sqrt(var).data.unsqueeze(0)
 
+class PNet(nn.Module):
+    def __init__(self, DEVICE):
+        super(PNet, self).__init__()
+        self.l1 = torch.nn.TransformerEncoderLayer(d_model = 1, nhead = 1, batch_first=True).to(DEVICE)
+        self.l2 = torch.nn.TransformerEncoderLayer(d_model = 1, nhead = 1, batch_first=True).to(DEVICE)
+        
+    def forward(self, seq, mask): 
+        o = self.l1(seq.unsqueeze(2), src_key_padding_mask=mask)
+        return self.l2(o)
+        
+class FNet(nn.module):
+    def __init__(self, X, Y, hidden_layer_sizes):
+        super(FNet, self).__init__()
+        # Initialize linear layer with least squares solution
+        X_ = np.hstack([X, np.ones((X.shape[0],1))])
+        Theta = np.linalg.solve(X_.T.dot(X_), X_.T.dot(Y))
+        
+        self.lin = nn.Linear(X.shape[1], Y.shape[1] * 24)
+        W,b = self.lin.parameters()
+        W.data = torch.Tensor(Theta[:-1,:].T)
+        b.data = torch.Tensor(Theta[-1,:])
+        
+        # Set up non-linear network of 
+        # Linear -> BatchNorm -> ReLU -> Dropout layers
+        layer_sizes = [X.shape[1]] + hidden_layer_sizes
+        layers = reduce(operator.add, 
+            [[nn.Linear(a,b), nn.BatchNorm1d(b), nn.ReLU(), nn.Dropout(p=0.2)] 
+                for a,b in zip(layer_sizes[0:-1], layer_sizes[1:])])
+        layers += [nn.Linear(layer_sizes[-1], Y.shape[1] * 24)]
+        self.net = nn.Sequential(*layers)
+                
+    def forward(self, x, w):
+        inp = F.one_hot(w, num_classes=24).float()
+        return self.lin(x) + self.net(x) 
 
+        
 class InterpretableNet(nn.Module): 
     def __init__(self, X, Y, base_forecast, params): 
         super(InterpretableNet, self).__init__()

@@ -10,6 +10,12 @@ import torch.optim as optim
 
 import model_classes
 from constants import *
+from data import get_decision_mask
+
+def get_loader(X, y): 
+    training_set = [[X[i], y[i]] for i in range(len(X))]
+    return torch.utils.data.DataLoader(training_set, batch_size=50, shuffle=True)
+
 
 
 
@@ -86,6 +92,92 @@ def run_weighted_rmse_net_helper(X_train, Y_train, X_test, Y_test, params, weigh
     model.set_sig(X_train_, Y_train_)
 
     return model, weights2
+
+def train_end_to_end(X_train, Y_train, variables, params, EPOCHS, DEVICE): 
+    model = model_classes.Net(X_train, Y_train, [200, 200]).to(DEVICE)
+    
+    data_loader = get_loader(variables["X_train_"], variables["Y_train_"])
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    
+    losses = [] 
+    for epoch in range(EPOCHS):
+        for data in data_loader:
+            optimizer.zero_grad() 
+            
+            x, y = data 
+            v = model(x)[0]
+            loss = task_loss(v, y, params).mean()
+            
+            loss.backward()
+            optimizer.step()
+            
+            losses.append(loss.cpu().item())
+            
+        if epoch % (EPOCHS//10) == 0: 
+            print("epoch:", epoch, " ", np.mean(losses[-100:]))
+    return model
+
+def train_pnet(Y_train, params, EPOCHS, DEVICE): 
+    model = model_classes.PNet(DEVICE).to(DEVICE)
+    mask_data = get_decision_mask(Y_train, DEVICE)
+    
+    data_loader = get_loader(Y_train, mask_data)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    
+    losses = [] 
+    for epoch in range(EPOCHS):
+        for data in data_loader:
+            optimizer.zero_grad() 
+            
+            y, m = data 
+            v = model(y, m).squeeze(2)
+            loss = task_loss(v, y, params).mean()
+            
+            loss.backward()
+            optimizer.step()
+            
+            losses.append(loss.cpu().item())
+            
+        if epoch % (EPOCHS//10) == 0: 
+            print("epoch:", epoch, " ", np.mean(losses[-100:]))
+    return model
+
+
+def train_fnet(p_net, x, y, variables, params, EPOCHS, DEVICE): 
+    model = model_classes.net(x, y, [200, 200]).to(DEVICE)
+    X_train = variables["X_train_"]
+    Y_train = variables["Y_train_"]
+    
+    data_loader = get_loader(Y_train, mask_data)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+    mask_data, w_data = get_decision_mask(Y_train, DEVICE, get_w=True)
+
+    losses = [] 
+    for epoch in range(EPOCHS):
+        for i in range(0, n_data, batch):
+            optimizer.zero_grad() 
+            
+            x = X_train[i:i+batch,:]
+            y = Y_train[i:i+batch,:]
+            m = mask_data[i:i+batch,:]
+            w = w_data[i:i+batch]
+                        
+            pred = model(x, w)
+            p_pred =
+            
+            loss = task_loss(v, y, params).mean()
+            
+            loss.backward()
+            optimizer.step()
+            
+            losses.append(loss.cpu().item())
+            
+        if epoch % (EPOCHS//10) == 0: 
+            print("epoch:", epoch, " ", np.mean(losses[-100:]))
+    return model
+
+
+    
 
 def batch_train_weightrmse(batch_sz, epoch, X_train_t, Y_train_t, model, opt, weights_t):
 
