@@ -23,7 +23,7 @@ def task_loss(Y_sched, Y_actual, params):
             params["gamma_over"] * torch.clamp(Y_sched - Y_actual, min=0)).mean(0)
 
 class Net(nn.Module):
-    def __init__(self, X, Y, hidden_layer_sizes):
+    def __init__(self, X, Y, hidden_layer_sizes, DEVICE="cuda"):
         super(Net, self).__init__()
 
         # Initialize linear layer with least squares solution
@@ -34,6 +34,8 @@ class Net(nn.Module):
         W,b = self.lin.parameters()
         W.data = torch.Tensor(Theta[:-1,:].T)
         b.data = torch.Tensor(Theta[-1,:])
+        
+        self.DEVICE=DEVICE 
         
         # Set up non-linear network of 
         # Linear -> BatchNorm -> ReLU -> Dropout layers
@@ -46,8 +48,11 @@ class Net(nn.Module):
         self.sig = Parameter(torch.ones(1, Y.shape[1], device=DEVICE))
         
     def forward(self, x):
-        return self.lin(x) + self.net(x), \
-            self.sig.expand(x.size(0), self.sig.size(1))
+        return self.lin(x) + self.net(x)
+    
+    def predict(self, x, var = 0): 
+        o = self.lin(x) + self.net(x)
+        return o #+ torch.arange(0,24).to(self.DEVICE)/240 * 1
     
     def set_sig(self, X, Y):
         Y_pred = self.lin(X) + self.net(X)
@@ -55,16 +60,30 @@ class Net(nn.Module):
         self.sig.data = torch.sqrt(var).data.unsqueeze(0)
 
 class PNet(nn.Module):
-    def __init__(self, DEVICE):
+    def __init__(self, e_net, DEVICE):
         super(PNet, self).__init__()
-        self.l1 = torch.nn.TransformerEncoderLayer(d_model = 1, nhead = 1, batch_first=True).to(DEVICE)
-        self.l2 = torch.nn.TransformerEncoderLayer(d_model = 1, nhead = 1, batch_first=True).to(DEVICE)
+        self.e_net = e_net
+        self.e_net.eval() 
+
+        self.l1 = torch.nn.Linear(24, 200)
+        self.l2 = torch.nn.Linear(200, 24)
+        # self.l1 = torch.nn.TransformerEncoderLayer(d_model = 1, nhead = 1, batch_first=True).to(DEVICE)
+        # self.l2 = torch.nn.TransformerEncoderLayer(d_model = 1, nhead = 1, batch_first=True).to(DEVICE)
+        # self.l3 = torch.nn.TransformerEncoderLayer(d_model = 1, nhead = 1, batch_first=True).to(DEVICE)
         
-    def forward(self, seq, mask): 
-        o = self.l1(seq.unsqueeze(2), src_key_padding_mask=mask)
-        return self.l2(o)
-        
-class FNet(nn.module):
+    def forward(self, x, seq, mask, var): 
+        o = torch.nn.functional.relu(self.l1(seq * mask))
+        o = self.l2(o)
+        # o = self.l1((seq * mask).unsqueeze(2))
+        with torch.no_grad():
+            a = self.e_net.predict(x, var)
+        # o = self.l2(o)
+        # o = self.l3(o)
+        # print(torch.sum(mask, 1))
+        # return o.squeeze(2) + a  
+        return o + a  
+    
+class FNet(nn.Module):
     def __init__(self, X, Y, hidden_layer_sizes):
         super(FNet, self).__init__()
         # Initialize linear layer with least squares solution
@@ -73,8 +92,10 @@ class FNet(nn.module):
         
         self.lin = nn.Linear(X.shape[1], Y.shape[1] * 24)
         W,b = self.lin.parameters()
-        W.data = torch.Tensor(Theta[:-1,:].T)
-        b.data = torch.Tensor(Theta[-1,:])
+
+        for i in range(24): 
+            W.data[i*24:i*24+24,:] = torch.Tensor(Theta[:-1,:].T)
+            b.data[i*24:i*24+24] = torch.Tensor(Theta[-1,:])
         
         # Set up non-linear network of 
         # Linear -> BatchNorm -> ReLU -> Dropout layers
@@ -85,8 +106,7 @@ class FNet(nn.module):
         layers += [nn.Linear(layer_sizes[-1], Y.shape[1] * 24)]
         self.net = nn.Sequential(*layers)
                 
-    def forward(self, x, w):
-        inp = F.one_hot(w, num_classes=24).float()
+    def forward(self, x):
         return self.lin(x) + self.net(x) 
 
         
@@ -133,9 +153,6 @@ class InterpretableNet(nn.Module):
                 f = self.predict(input)
                 
                 decision = self.solver(f)[:,:self.params["n"]]
-
-                # print("decision:", decision[0])
-                # print("pred:", f[0])
 
                 error = task_loss(decision, d, self.params) / len(d) 
 

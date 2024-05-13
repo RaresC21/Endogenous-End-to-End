@@ -76,6 +76,7 @@ def get_data(DEVICE):
     Y_test_pt = torch.tensor(Y_test, dtype=torch.float, device=DEVICE)
     return X_train, Y_train, X_test, Y_test, X_train_pt, Y_train_pt, X_test_pt, Y_test_pt
 
+
 def get_decision_mask(Y, DEVICE, get_w = False): 
     n = Y.shape[0]
     d = Y.shape[1]
@@ -89,3 +90,29 @@ def get_decision_mask(Y, DEVICE, get_w = False):
     if get_w: 
         return mask, w
     return mask
+
+def get_decision_mask_from_w(Y, w, DEVICE): 
+    n = Y.shape[0]
+    d = Y.shape[1]
+    mask = torch.ones_like(Y) 
+    r = torch.arange(n, device=DEVICE)
+    m = torch.ones_like(w) * (d-1)
+    for i in range(d): 
+        mask[r, w] = 0
+        w = torch.minimum(w + 1, m)
+    return mask
+
+
+def get_decision_mask_(Y, DEVICE, w_indx): 
+    n = Y.shape[0]
+    d = Y.shape[1]
+    w = torch.ones(n).to(DEVICE) * w_indx
+    w = w.long()
+    mask = torch.ones_like(Y) 
+    r = torch.arange(n, device=DEVICE)
+    m = torch.ones_like(w) * (d-1)
+    for i in range(d): 
+        mask[r, w] = 0
+        w = torch.minimum(w + 1, m)
+    return mask
+
