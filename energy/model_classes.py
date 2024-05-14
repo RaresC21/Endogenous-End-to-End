@@ -49,11 +49,7 @@ class Net(nn.Module):
         
     def forward(self, x):
         return self.lin(x) + self.net(x)
-    
-    def predict(self, x, var = 0): 
-        o = self.lin(x) + self.net(x)
-        return o #+ torch.arange(0,24).to(self.DEVICE)/240 * 1
-    
+        
     def set_sig(self, X, Y):
         Y_pred = self.lin(X) + self.net(X)
         var = torch.mean((Y_pred-Y)**2, 0)
@@ -71,12 +67,12 @@ class PNet(nn.Module):
         # self.l2 = torch.nn.TransformerEncoderLayer(d_model = 1, nhead = 1, batch_first=True).to(DEVICE)
         # self.l3 = torch.nn.TransformerEncoderLayer(d_model = 1, nhead = 1, batch_first=True).to(DEVICE)
         
-    def forward(self, x, seq, mask, var): 
+    def forward(self, x, seq, mask):
         o = torch.nn.functional.relu(self.l1(seq * mask))
         o = self.l2(o)
         # o = self.l1((seq * mask).unsqueeze(2))
         with torch.no_grad():
-            a = self.e_net.predict(x, var)
+            a = self.e_net(x)
         # o = self.l2(o)
         # o = self.l3(o)
         # print(torch.sum(mask, 1))
@@ -106,8 +102,27 @@ class FNet(nn.Module):
         layers += [nn.Linear(layer_sizes[-1], Y.shape[1] * 24)]
         self.net = nn.Sequential(*layers)
                 
-    def forward(self, x):
-        return self.lin(x) + self.net(x) 
+    def forward(self, x, w):
+        o = self.lin(x) + self.net(x) 
+        return o[:, w*24 : w*24 + 24]
+
+class RNet(nn.Module):
+    def __init__(self, X, Y, hidden_layer_sizes):
+        super(RNet, self).__init__()        
+        self.lin = nn.Linear(X.shape[1], Y.shape[1])
+        
+        # Set up non-linear network of 
+        # Linear -> BatchNorm -> ReLU -> Dropout layers
+        layer_sizes = [X.shape[1]] + hidden_layer_sizes
+        layers = reduce(operator.add, 
+            [[nn.Linear(a,b), nn.BatchNorm1d(b), nn.ReLU(), nn.Dropout(p=0.2)] 
+                for a,b in zip(layer_sizes[0:-1], layer_sizes[1:])])
+        layers += [nn.Linear(layer_sizes[-1], Y.shape[1])]
+        self.net = nn.Sequential(*layers)
+                
+    def forward(self, x, w):
+        o = self.lin(x) + self.net(x) 
+        return o[:,w]
 
         
 class InterpretableNet(nn.Module): 

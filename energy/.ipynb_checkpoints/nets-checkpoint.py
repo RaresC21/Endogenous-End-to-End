@@ -111,7 +111,7 @@ def train_end_to_end(X_train, Y_train, variables, params, EPOCHS, DEVICE):
             print("epoch:", epoch, " ", np.mean(losses[-10:]))
     return model
 
-def train_pnet(e_net, X_train, Y_train, params, EPOCHS, DEVICE, var=0): 
+def train_pnet(e_net, X_train, Y_train, params, EPOCHS, DEVICE): 
     model = model_classes.PNet(e_net, DEVICE).to(DEVICE)
     mask_data = get_decision_mask(Y_train, DEVICE)
     
@@ -131,7 +131,7 @@ def train_pnet(e_net, X_train, Y_train, params, EPOCHS, DEVICE, var=0):
             w = np.random.randint(0,24)
             m = get_decision_mask_(y, DEVICE, w)
             
-            v = model(x, y, m, var)
+            v = model(x, y, m)
             loss = task_loss(v, y, params).mean()
             
             loss.backward()
@@ -144,7 +144,7 @@ def train_pnet(e_net, X_train, Y_train, params, EPOCHS, DEVICE, var=0):
     return model
 
 
-def train_fnet(model, p_net, xx, yy, variables, params, EPOCHS, DEVICE, var=0): 
+def train_fnet(model, p_net, xx, yy, variables, params, EPOCHS, DEVICE): 
     # model = model_classes.FNet(xx, yy, [200, 200]).to(DEVICE)
     X_train = variables["X_train_"]
     Y_train = variables["Y_train_"]
@@ -168,12 +168,12 @@ def train_fnet(model, p_net, xx, yy, variables, params, EPOCHS, DEVICE, var=0):
             w = np.random.randint(0,24)
             m = get_decision_mask_(y, DEVICE, w)
             
-            f_pred = model(x)[:, w*24 : w*24 + 24]
-            p_pred = p_net(x, f_pred, m, var) 
-            p_pred_true = p_net(x, y, m, var)
+            f_pred = model(x, w)
+            p_pred = p_net(x, f_pred, m) 
+            p_pred_true = p_net(x, y, m)
             
             v1 = f_pred[:,:w]
-            v1_true = p_net.e_net.predict(x, var)[:,:w]
+            v1_true = p_net.e_net(x)[:,:w]
             v2 = p_pred[:,w:]
             v_2true = p_pred_true[:,w:]
             
@@ -201,8 +201,49 @@ def train_fnet(model, p_net, xx, yy, variables, params, EPOCHS, DEVICE, var=0):
     model.to(DEVICE)
     return model
 
+def single_loss(p_net, x, y, w, params): 
+    m = get_decision_mask_(y, DEVICE, w)
 
+    p_pred = p_net(x, y, m)
+
+    v1 = p_net(x, y, torch.zeros_like(y))[:,:w]
+    v2 = p_pred[:,w:]
+    v = torch.cat((v1, v2), 1)
+
+    loss = task_loss(v, y, params).mean()
+    return loss.item()
+        
+
+def train_reward_learner(p_net, xx, yy, variables, params, EPOCHS, DEVICE):
+    model = model_classes.RNet(xx, yy, [200, 200]).to(DEVICE)
+    X_train = variables["X_train_"]
+    Y_train = variables["Y_train_"]
+        
+    batch = 50
+    n_data = X_train.shape[0]
     
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    losses = [] 
+    
+    for epoch in range(EPOCHS):
+        for i in range(0, n_data, batch):
+            optimizer.zero_grad() 
+            
+            w = np.random.randint(0,24)
+            x = X_train[i:i+batch,:]
+            y = Y_train[i:i+batch,:]
+            l = single_loss(p_net, x, y, w, params)
+            
+            pred = model(x, w) 
+            # print(pred.shape)
+            loss = torch.mean((pred - l) ** 2)
+            loss.backward() 
+            optimizer.step()
+            
+            losses.append(loss.item())
+        if epoch % (EPOCHS // 100) == 0: 
+            print(epoch, np.mean(losses[-100:]))
+    return model 
 
 def batch_train_weightrmse(batch_sz, epoch, X_train_t, Y_train_t, model, opt, weights_t):
 
