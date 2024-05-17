@@ -152,7 +152,7 @@ def train_fnet(model, p_net, xx, yy, variables, params, EPOCHS, DEVICE):
     batch = 50
     n_data = X_train.shape[0]
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=2e-6)
+    optimizer = torch.optim.Adam(model.parameters(), lr=2e-5)
 
     losses = [] 
     best_state = None
@@ -193,12 +193,13 @@ def train_fnet(model, p_net, xx, yy, variables, params, EPOCHS, DEVICE):
             best_loss = np.mean(losses[-20:])
             best_state = model.state_dict().copy()
             
-            
+        if np.mean(losses[-100:]) < 0.003: 
+            break
         if epoch % (EPOCHS//100) == 0: 
             print("epoch:", epoch, " ", np.mean(losses[-100:]))
-    model = model_classes.FNet(xx, yy, [200, 200])
-    model.load_state_dict(best_state)
-    model.to(DEVICE)
+    # model = model_classes.FNet(xx, yy, [200, 200])
+    # model.load_state_dict(best_state)
+    # model.to(DEVICE)
     return model
 
 def single_loss(p_net, x, y, w, params): 
