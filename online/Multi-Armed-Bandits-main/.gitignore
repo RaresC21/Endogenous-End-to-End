@@ -1,0 +1,6 @@
+venv/
+
+__pycache__
+.DS_Store
+gurobi.log
+test_gurobi.py
