@@ -128,8 +128,8 @@ if __name__ == '__main__':
     mask = get_decision_mask(Y_train_pt, DEVICE)
 
     width = 200
-    EPOCHS_rmse = 1
-    EPOCHS = 1
+    EPOCHS_rmse = 4000
+    EPOCHS = 4000
 
     print("TRAINING 2-STAGE")
     model_rmse = model_classes.Net(X_train[:,:-1], Y_train, [width, width]).to(DEVICE)
