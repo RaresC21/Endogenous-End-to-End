@@ -56,8 +56,8 @@ def load_data_with_features(filename):
     return X, Y
 
 def get_data(DEVICE): 
-    X1, Y1 = load_data_with_features('pjm_load_data_2008-11.txt')
-    X2, Y2 = load_data_with_features('pjm_load_data_2012-16.txt')
+    X1, Y1 = load_data_with_features('data/pjm_load_data_2008-11.txt')
+    X2, Y2 = load_data_with_features('data/pjm_load_data_2012-16.txt')
 
     X = np.concatenate((X1, X2), axis=0)
     X[:,:-1] = (X[:,:-1] - np.mean(X[:,:-1], axis=0)) / np.std(X[:,:-1], axis=0)

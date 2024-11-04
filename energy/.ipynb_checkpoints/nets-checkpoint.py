@@ -59,6 +59,7 @@ def run_weighted_rmse_net(X_train, Y_train, X_test, Y_test, params):
         weights = weights2.detach()
     return model
 
+
 def run_weighted_rmse_net_helper(X_train, Y_train, X_test, Y_test, params, weights, i):
     X_train_ = torch.tensor(X_train[:,:-1], dtype=torch.float, device=DEVICE)
     Y_train_ = torch.tensor(Y_train, dtype=torch.float, device=DEVICE)
@@ -87,6 +88,7 @@ def run_weighted_rmse_net_helper(X_train, Y_train, X_test, Y_test, params, weigh
 
     return model, weights2
 
+
 def train_end_to_end(X_train, Y_train, variables, params, EPOCHS, DEVICE): 
     model = model_classes.Net(X_train, Y_train, [200, 200]).to(DEVICE)
     
@@ -107,8 +109,8 @@ def train_end_to_end(X_train, Y_train, variables, params, EPOCHS, DEVICE):
             
             losses.append(loss.cpu().item())
             
-        if epoch % (EPOCHS//10) == 0: 
-            print("epoch:", epoch, " ", np.mean(losses[-10:]))
+        # if epoch % (EPOCHS//10) == 0: 
+        #     print("epoch:", epoch, " ", np.mean(losses[-10:]))
     return model
 
 def train_pnet(e_net, X_train, Y_train, params, EPOCHS, DEVICE): 
@@ -139,13 +141,12 @@ def train_pnet(e_net, X_train, Y_train, params, EPOCHS, DEVICE):
             
             losses.append(loss.cpu().item())
             
-        if epoch % (EPOCHS//10) == 0: 
-            print("epoch:", epoch, " ", np.mean(losses[-100:]))
+        # if epoch % (EPOCHS//10) == 0: 
+        #     print("epoch:", epoch, " ", np.mean(losses[-100:]))
     return model
 
 
 def train_fnet(model, p_net, xx, yy, variables, params, EPOCHS, DEVICE): 
-    # model = model_classes.FNet(xx, yy, [200, 200]).to(DEVICE)
     X_train = variables["X_train_"]
     Y_train = variables["Y_train_"]
 
@@ -195,11 +196,8 @@ def train_fnet(model, p_net, xx, yy, variables, params, EPOCHS, DEVICE):
             
         if np.mean(losses[-100:]) < 0.003: 
             break
-        if epoch % (EPOCHS//100) == 0: 
-            print("epoch:", epoch, " ", np.mean(losses[-100:]))
-    # model = model_classes.FNet(xx, yy, [200, 200])
-    # model.load_state_dict(best_state)
-    # model.to(DEVICE)
+        # if epoch % (EPOCHS//100) == 0: 
+        #     print("epoch:", epoch, " ", np.mean(losses[-100:]))
     return model
 
 def single_loss(p_net, x, y, w, params): 
@@ -242,8 +240,8 @@ def train_reward_learner(p_net, xx, yy, variables, params, EPOCHS, DEVICE):
             optimizer.step()
             
             losses.append(loss.item())
-        if epoch % (EPOCHS // 100) == 0: 
-            print(epoch, np.mean(losses[-100:]))
+        # if epoch % (EPOCHS // 100) == 0: 
+        #     print(epoch, np.mean(losses[-100:]))
     return model 
 
 def batch_train_weightrmse(batch_sz, epoch, X_train_t, Y_train_t, model, opt, weights_t):
@@ -351,37 +349,9 @@ def eval_net(which, model, variables, params):
     if (which == "task_net"):
         hold_rmse = rmse_loss(mu_pred_hold, variables['Y_hold_'])
 
-    # with open(
-    #     os.path.join(save_folder, '{}_train_rmse'.format(which)), 'wb') as f:
-    #     np.save(f, train_rmse)
-
-    # with open(
-    #     os.path.join(save_folder, '{}_test_rmse'.format(which)), 'wb') as f:
-    #     np.save(f, test_rmse)
-
-    # if (which == "task_net"):
-    #     with open(
-    #         os.path.join(save_folder, '{}_hold_rmse'.format(which)), 'wb') as f:
-    #         np.save(f, hold_rmse)
-
-    # Eval model on task loss
-    # Y_sched_train = solver(mu_pred_train.double(), sig_pred_train.double())
-    # train_loss_task = task_loss_no_mean(
-    #     Y_sched_train.float(), variables['Y_train_'], params)
-
     Y_sched_test = solver(mu_pred_test.double(), sig_pred_test.double())
     test_loss_task = task_loss_no_mean(
         Y_sched_test.float(), variables['Y_test_'], params)
     print(test_loss_task.detach().cpu().numpy())
 
-    # if (which == "task_net"):
-    #     Y_sched_hold = solver(mu_pred_hold.double(), sig_pred_hold.double())
-    #     hold_loss_task = task_loss_no_mean(
-    #         Y_sched_hold.float(), variables['Y_hold_'], params)
-
-    # np.save(os.path.join(save_folder, '{}_train_task'.format(which)), train_loss_task.detach().cpu().numpy())
-    # np.save(os.path.join(save_folder, '{}_test_task'.format(which)), test_loss_task.detach().cpu().numpy())
-
-    # if (which == "task_net"):
-    #     np.save(os.path.join(save_folder, '{}_hold_task'.format(which)), hold_loss_task.detach().cpu().numpy())
     return test_loss_task.detach().numpy()
